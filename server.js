@@ -35,7 +35,8 @@ const members = [
   'charan',
   'mukilan',
   'kalai',
-  'yasar'
+  'yasar',
+  'test'
 ];
 
 const users = Object.fromEntries(
