@@ -14,8 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'busted-minds-secret';
 
-const uploadsDir = path.join(__dirname, 'uploads');
-const dataDir = path.join(__dirname, 'data');
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 const votesFile = path.join(dataDir, 'votes.json');
 
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -130,6 +130,24 @@ const upload = multer({
   }
 });
 
+function escapeHtmlServer(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function safeJsonRead(filePath, fallback) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
 app.get('/', (_req, res) => {
   res.type('html').send(html);
 });
@@ -155,7 +173,7 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/me', auth, (req, res) => {
-  const votes = JSON.parse(fs.readFileSync(votesFile, 'utf8'));
+  const votes = safeJsonRead(votesFile, []);
   const existingVote = votes.find((vote) => vote.name === req.user.name);
 
   res.json({
@@ -178,7 +196,7 @@ app.post('/api/vote', auth, upload.single('video'), (req, res) => {
     return res.status(400).json({ error: 'Video is required' });
   }
 
-  const votes = JSON.parse(fs.readFileSync(votesFile, 'utf8'));
+  const votes = safeJsonRead(votesFile, []);
   const existingIndex = votes.findIndex((vote) => vote.name === req.user.name);
 
   if (existingIndex !== -1) {
@@ -220,8 +238,40 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-app.get('/admin/results', requireAdmin, (_req, res) => {
-  const votes = JSON.parse(fs.readFileSync(votesFile, 'utf8'));
+app.post('/admin/delete-vote', requireAdmin, (req, res) => {
+  const name = String(req.body.name || '').trim().toLowerCase();
+
+  if (!name) {
+    return res.status(400).json({ error: 'Member name is required' });
+  }
+
+  const votes = safeJsonRead(votesFile, []);
+  const vote = votes.find((item) => item.name === name);
+
+  if (!vote) {
+    return res.status(404).json({ error: 'No vote found for this member' });
+  }
+
+  if (vote.videoUrl) {
+    const videoFile = path.basename(vote.videoUrl);
+    const videoPath = path.join(uploadsDir, videoFile);
+
+    if (fs.existsSync(videoPath)) {
+      fs.unlinkSync(videoPath);
+    }
+  }
+
+  const updatedVotes = votes.filter((item) => item.name !== name);
+  fs.writeFileSync(votesFile, JSON.stringify(updatedVotes, null, 2));
+
+  res.json({
+    success: true,
+    deleted: name
+  });
+});
+
+app.get('/admin/results', requireAdmin, (req, res) => {
+  const votes = safeJsonRead(votesFile, []);
 
   const counts = parties.map((party) => ({
     ...party,
@@ -229,13 +279,26 @@ app.get('/admin/results', requireAdmin, (_req, res) => {
   }));
 
   const rows = votes.map((vote) => {
+    const safeName = escapeHtmlServer(vote.name);
+    const safeNameJson = JSON.stringify(vote.name);
+    const safeSymbol = escapeHtmlServer(vote.symbol);
+    const safeParty = escapeHtmlServer(vote.party);
+    const safeCandidate = escapeHtmlServer(vote.candidate);
+    const safeVideoUrl = escapeHtmlServer(vote.videoUrl);
+    const safeSubmittedAt = escapeHtmlServer(
+      vote.submittedAt ? new Date(vote.submittedAt).toLocaleString() : ''
+    );
+
     return `
       <tr>
-        <td>${vote.name}</td>
-        <td>${vote.symbol} ${vote.party}</td>
-        <td>${vote.candidate}</td>
-        <td>${new Date(vote.submittedAt).toLocaleString()}</td>
-        <td><a href="${vote.videoUrl}" target="_blank">Open video</a></td>
+        <td>${safeName}</td>
+        <td>${safeSymbol} ${safeParty}</td>
+        <td>${safeCandidate}</td>
+        <td>${safeSubmittedAt}</td>
+        <td><a href="${safeVideoUrl}" target="_blank">Open video</a></td>
+        <td>
+          <button class="delete-btn" onclick='deleteVote(${safeNameJson})'>Delete</button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -243,8 +306,8 @@ app.get('/admin/results', requireAdmin, (_req, res) => {
   const countRows = counts.map((party) => {
     return `
       <tr>
-        <td>${party.symbol} ${party.party}</td>
-        <td>${party.candidate}</td>
+        <td>${escapeHtmlServer(party.symbol)} ${escapeHtmlServer(party.party)}</td>
+        <td>${escapeHtmlServer(party.candidate)}</td>
         <td>${party.votes}</td>
       </tr>
     `;
@@ -288,10 +351,38 @@ app.get('/admin/results', requireAdmin, (_req, res) => {
           color: #38bdf8;
           font-weight: bold;
         }
+
+        .delete-btn {
+          border: 0;
+          border-radius: 10px;
+          padding: 9px 12px;
+          background: #fb7185;
+          color: white;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        .delete-btn:hover {
+          background: #e11d48;
+        }
+
+        .admin-note {
+          padding: 14px;
+          border-radius: 14px;
+          background: rgba(56,189,248,.1);
+          border: 1px solid rgba(56,189,248,.25);
+          color: #bae6fd;
+          margin-bottom: 20px;
+          line-height: 1.5;
+        }
       </style>
     </head>
     <body>
       <h1>Election Admin Results</h1>
+
+      <div class="admin-note">
+        Admin mode is active. Use Delete only for testing or corrections.
+      </div>
 
       <h2>Vote Count</h2>
       <table>
@@ -316,12 +407,46 @@ app.get('/admin/results', requireAdmin, (_req, res) => {
             <th>Candidate</th>
             <th>Submitted At</th>
             <th>Video</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          ${rows || '<tr><td colspan="5">No votes yet.</td></tr>'}
+          ${rows || '<tr><td colspan="6">No votes yet.</td></tr>'}
         </tbody>
       </table>
+
+      <script>
+        async function deleteVote(name) {
+          const confirmed = confirm('Delete vote for ' + name + '? This cannot be undone.');
+
+          if (!confirmed) return;
+
+          const params = new URLSearchParams(window.location.search);
+          const key = params.get('key') || '';
+
+          try {
+            const res = await fetch('/admin/delete-vote?key=' + encodeURIComponent(key), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ name })
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+              alert(data.error || 'Failed to delete vote');
+              return;
+            }
+
+            alert('Deleted vote for ' + name);
+            window.location.reload();
+          } catch (err) {
+            alert('Failed to delete vote: ' + err.message);
+          }
+        }
+      </script>
     </body>
     </html>
   `);
