@@ -291,7 +291,7 @@ app.get('/admin/results', requireAdmin, (req, res) => {
 
     return `
       <tr>
-        <td>${safeName}</td>
+        <td><span class="member-pill">${safeName}</span></td>
         <td>${safeSymbol} ${safeParty}</td>
         <td>${safeCandidate}</td>
         <td>${safeSubmittedAt}</td>
@@ -313,107 +313,326 @@ app.get('/admin/results', requireAdmin, (req, res) => {
     `;
   }).join('');
 
+  const countCards = counts.map((party) => {
+    return `
+      <div class="result-card" style="--party-color: ${escapeHtmlServer(party.color)};">
+        <div class="result-symbol">${escapeHtmlServer(party.symbol)}</div>
+        <div>
+          <h3>${escapeHtmlServer(party.party)}</h3>
+          <p>${escapeHtmlServer(party.candidate)}</p>
+        </div>
+        <strong>${party.votes}</strong>
+      </div>
+    `;
+  }).join('');
+
   res.type('html').send(`
     <!DOCTYPE html>
     <html>
     <head>
       <title>Admin Results</title>
       <style>
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        :root {
+          --bg: #070711;
+          --card: rgba(255,255,255,.1);
+          --border: rgba(255,255,255,.18);
+          --text: #f8fafc;
+          --muted: #b8bfd7;
+          --gold: #facc15;
+          --cyan: #38bdf8;
+          --rose: #fb7185;
+          --green: #34d399;
+        }
+
         body {
-          font-family: Arial, sans-serif;
-          background: #070711;
-          color: white;
-          padding: 30px;
+          min-height: 100vh;
+          font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          color: var(--text);
+          background:
+            radial-gradient(circle at top left, rgba(56,189,248,.22), transparent 34%),
+            radial-gradient(circle at top right, rgba(250,204,21,.18), transparent 30%),
+            radial-gradient(circle at bottom, rgba(167,139,250,.2), transparent 35%),
+            var(--bg);
+          padding: 28px;
+        }
+
+        body::before {
+          content: "";
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          background-image:
+            linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+          background-size: 36px 36px;
+          opacity: .46;
+        }
+
+        .admin-shell {
+          position: relative;
+          z-index: 1;
+          width: min(1120px, 100%);
+          margin: 0 auto;
+        }
+
+        .admin-topbar {
+          display: flex;
+          justify-content: space-between;
+          gap: 18px;
+          align-items: center;
+          padding: 18px 20px;
+          border: 1px solid var(--border);
+          border-radius: 28px;
+          background: rgba(7,7,17,.72);
+          box-shadow: 0 18px 60px rgba(0,0,0,.32);
+          backdrop-filter: blur(18px);
+          margin-bottom: 22px;
+        }
+
+        .admin-topbar p,
+        .panel p,
+        .result-card p {
+          color: var(--muted);
+          line-height: 1.5;
         }
 
         h1, h2 {
-          color: #facc15;
+          letter-spacing: 0;
+        }
+
+        h1 {
+          font-size: clamp(2rem, 5vw, 4.2rem);
+          line-height: .95;
+        }
+
+        h2 {
+          color: var(--gold);
+          margin-bottom: 14px;
+        }
+
+        .admin-badge {
+          padding: 10px 13px;
+          border-radius: 999px;
+          background: rgba(52,211,153,.12);
+          border: 1px solid rgba(52,211,153,.34);
+          color: #bbf7d0;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+
+        .admin-note {
+          padding: 15px 16px;
+          border-radius: 18px;
+          background: rgba(56,189,248,.1);
+          border: 1px solid rgba(56,189,248,.25);
+          color: #bae6fd;
+          margin-bottom: 22px;
+          line-height: 1.55;
+          font-weight: 750;
+        }
+
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+          margin-bottom: 22px;
+        }
+
+        .result-card,
+        .panel {
+          border: 1px solid var(--border);
+          background: linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.045));
+          box-shadow: 0 28px 84px rgba(0,0,0,.34);
+          backdrop-filter: blur(18px);
+        }
+
+        .result-card {
+          min-height: 146px;
+          padding: 18px;
+          border-radius: 24px;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 14px;
+          border-color: color-mix(in srgb, var(--party-color) 48%, rgba(255,255,255,.14));
+        }
+
+        .result-symbol {
+          width: 56px;
+          height: 56px;
+          border-radius: 18px;
+          display: grid;
+          place-items: center;
+          font-size: 2rem;
+          background: color-mix(in srgb, var(--party-color) 18%, transparent);
+          border: 1px solid color-mix(in srgb, var(--party-color) 34%, transparent);
+        }
+
+        .result-card h3 {
+          font-size: 1rem;
+          line-height: 1.2;
+          margin-bottom: 6px;
+        }
+
+        .result-card strong {
+          color: var(--gold);
+          font-size: 2.4rem;
+          line-height: 1;
+        }
+
+        .panel {
+          border-radius: 28px;
+          overflow: hidden;
+          margin-bottom: 28px;
+        }
+
+        .panel-header {
+          padding: 22px;
+          border-bottom: 1px solid rgba(255,255,255,.12);
+        }
+
+        .table-wrap {
+          overflow-x: auto;
         }
 
         table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 35px;
-          background: rgba(255,255,255,.08);
+          background: rgba(255,255,255,.045);
         }
 
         th, td {
-          border: 1px solid rgba(255,255,255,.2);
-          padding: 12px;
+          border-bottom: 1px solid rgba(255,255,255,.12);
+          padding: 14px 16px;
           text-align: left;
+          vertical-align: middle;
         }
 
         th {
-          background: rgba(250,204,21,.18);
+          background: rgba(250,204,21,.14);
+          color: #fde68a;
+          font-size: .78rem;
+          letter-spacing: 0;
+          text-transform: uppercase;
         }
 
         a {
-          color: #38bdf8;
-          font-weight: bold;
+          color: var(--cyan);
+          font-weight: 900;
+          text-decoration: none;
         }
 
         .delete-btn {
           border: 0;
-          border-radius: 10px;
-          padding: 9px 12px;
-          background: #fb7185;
+          border-radius: 14px;
+          padding: 10px 13px;
+          background: rgba(251,113,133,.24);
+          border: 1px solid rgba(251,113,133,.42);
           color: white;
-          font-weight: bold;
+          font-weight: 950;
           cursor: pointer;
         }
 
         .delete-btn:hover {
-          background: #e11d48;
+          background: rgba(225,29,72,.78);
         }
 
-        .admin-note {
-          padding: 14px;
-          border-radius: 14px;
-          background: rgba(56,189,248,.1);
-          border: 1px solid rgba(56,189,248,.25);
-          color: #bae6fd;
-          margin-bottom: 20px;
-          line-height: 1.5;
+        .member-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 7px 10px;
+          background: rgba(52,211,153,.11);
+          border: 1px solid rgba(52,211,153,.26);
+          color: #bbf7d0;
+          font-weight: 900;
+        }
+
+        @media (max-width: 860px) {
+          body {
+            padding: 18px;
+          }
+
+          .admin-topbar {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .summary-grid {
+            grid-template-columns: 1fr;
+          }
         }
       </style>
     </head>
     <body>
-      <h1>Election Admin Results</h1>
+      <main class="admin-shell">
+        <div class="admin-topbar">
+          <div>
+            <h1>BMEC Results</h1>
+            <p>Private Busted Minds vote control room.</p>
+          </div>
+          <div class="admin-badge">Admin verified</div>
+        </div>
 
-      <div class="admin-note">
-        Admin mode is active. Use Delete only for testing or corrections.
-      </div>
+        <div class="admin-note">
+          Admin mode is active. Use Delete only for testing or corrections.
+        </div>
 
-      <h2>Vote Count</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Party</th>
-            <th>Candidate</th>
-            <th>Votes</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${countRows}
-        </tbody>
-      </table>
+        <section class="summary-grid">
+          ${countCards}
+        </section>
 
-      <h2>Submitted Videos</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>Party</th>
-            <th>Candidate</th>
-            <th>Submitted At</th>
-            <th>Video</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows || '<tr><td colspan="6">No votes yet.</td></tr>'}
-        </tbody>
-      </table>
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Vote Count</h2>
+            <p>Live party totals from submitted verified videos.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Party</th>
+                  <th>Candidate</th>
+                  <th>Votes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${countRows}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Submitted Videos</h2>
+            <p>Audit trail for each locked member ballot.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Party</th>
+                  <th>Candidate</th>
+                  <th>Submitted At</th>
+                  <th>Video</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="6">No votes yet.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
 
       <script>
         async function deleteVote(name) {
@@ -482,6 +701,7 @@ const html = String.raw`<!DOCTYPE html>
       --rose: #fb7185;
       --violet: #a78bfa;
       --green: #34d399;
+      --orange: #fb923c;
     }
 
     body {
@@ -574,6 +794,18 @@ const html = String.raw`<!DOCTYPE html>
       font-size: .88rem;
     }
 
+    .status-pill.verified {
+      background: rgba(52,211,153,.12);
+      border-color: rgba(52,211,153,.34);
+      color: #bbf7d0;
+    }
+
+    .status-pill.submitted {
+      background: rgba(56,189,248,.13);
+      border-color: rgba(56,189,248,.34);
+      color: #bae6fd;
+    }
+
     .hero {
       text-align: center;
       padding: 56px 0 34px;
@@ -604,7 +836,7 @@ const html = String.raw`<!DOCTYPE html>
     h1 {
       font-size: clamp(2.6rem, 8vw, 6.7rem);
       line-height: .9;
-      letter-spacing: -.07em;
+      letter-spacing: 0;
       margin: 22px auto 18px;
       max-width: 900px;
     }
@@ -647,7 +879,7 @@ const html = String.raw`<!DOCTYPE html>
 
     .card-header h2 {
       font-size: 1.55rem;
-      letter-spacing: -.035em;
+      letter-spacing: 0;
     }
 
     .card-header p {
@@ -666,7 +898,7 @@ const html = String.raw`<!DOCTYPE html>
       font-weight: 900;
       font-size: .82rem;
       text-transform: uppercase;
-      letter-spacing: .08em;
+      letter-spacing: 0;
       margin: 0 0 8px;
     }
 
@@ -696,10 +928,61 @@ const html = String.raw`<!DOCTYPE html>
       box-shadow: 0 18px 46px rgba(250,204,21,.24);
       transition: .18s ease;
       width: 100%;
+      min-height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
     }
 
     .btn:hover {
       transform: translateY(-3px);
+    }
+
+    .btn-icon {
+      width: 23px;
+      height: 23px;
+      border-radius: 9px;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+      background: rgba(23,18,10,.12);
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .btn.secondary .btn-icon,
+    .btn.danger .btn-icon {
+      background: rgba(255,255,255,.12);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: .72;
+    }
+
+    .btn:disabled:hover {
+      transform: none;
+    }
+
+    .btn-loader {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(23,18,10,.28);
+      border-top-color: #17120a;
+      border-radius: 999px;
+      display: none;
+      animation: spin .75s linear infinite;
+    }
+
+    .btn.loading .btn-loader {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .btn.secondary {
@@ -723,6 +1006,51 @@ const html = String.raw`<!DOCTYPE html>
       margin-top: 14px;
     }
 
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .flow-step {
+      min-height: 70px;
+      padding: 10px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      display: grid;
+      align-content: center;
+      gap: 6px;
+      text-align: center;
+      transition: .18s ease;
+    }
+
+    .flow-step strong {
+      color: var(--text);
+      font-size: .85rem;
+      line-height: 1;
+    }
+
+    .flow-step span {
+      font-size: .75rem;
+      line-height: 1.2;
+    }
+
+    .flow-step.active {
+      border-color: rgba(250,204,21,.46);
+      background: rgba(250,204,21,.13);
+      box-shadow: 0 12px 38px rgba(250,204,21,.12);
+      color: #fde68a;
+    }
+
+    .flow-step.done {
+      border-color: rgba(52,211,153,.28);
+      background: rgba(52,211,153,.09);
+      color: #bbf7d0;
+    }
+
     .party-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -737,6 +1065,38 @@ const html = String.raw`<!DOCTYPE html>
       transition: .18s ease;
       cursor: pointer;
       min-height: 160px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .party::after {
+      content: "Select";
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.09);
+      border: 1px solid rgba(255,255,255,.12);
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 950;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: .18s ease;
+    }
+
+    .party:hover::after,
+    .party.active::after {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .party.active::after {
+      content: "Locked in";
+      color: #bbf7d0;
+      border-color: rgba(52,211,153,.28);
+      background: rgba(52,211,153,.12);
     }
 
     .party:hover,
@@ -774,6 +1134,70 @@ const html = String.raw`<!DOCTYPE html>
       object-fit: cover;
     }
 
+    .media-stage {
+      position: relative;
+      border-radius: 30px;
+      padding: 10px;
+      background:
+        linear-gradient(135deg, rgba(56,189,248,.2), rgba(250,204,21,.12), rgba(167,139,250,.18)),
+        rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.16);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 70px rgba(0,0,0,.26);
+    }
+
+    .media-stage video {
+      display: block;
+    }
+
+    .stage-meta {
+      position: absolute;
+      left: 20px;
+      top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      z-index: 2;
+    }
+
+    .stage-chip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(7,7,17,.72);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #e0f2fe;
+      font-size: .78rem;
+      font-weight: 950;
+      backdrop-filter: blur(12px);
+    }
+
+    .stage-chip.recording {
+      color: #fecdd3;
+      border-color: rgba(251,113,133,.38);
+      background: rgba(127,29,29,.52);
+    }
+
+    .stage-chip.recording::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      display: inline-block;
+      margin-right: 7px;
+      border-radius: 999px;
+      background: var(--rose);
+      box-shadow: 0 0 0 0 rgba(251,113,133,.56);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      70% {
+        box-shadow: 0 0 0 10px rgba(251,113,133,0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(251,113,133,0);
+      }
+    }
+
     .notice {
       padding: 14px;
       border-radius: 18px;
@@ -809,6 +1233,22 @@ const html = String.raw`<!DOCTYPE html>
       margin: 10px 0;
     }
 
+    .timer-chip {
+      display: flex;
+      justify-content: center;
+      margin: 12px 0 2px;
+    }
+
+    .timer {
+      min-width: 94px;
+      margin: 0;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: rgba(250,204,21,.12);
+      border: 1px solid rgba(250,204,21,.3);
+      box-shadow: 0 12px 34px rgba(250,204,21,.12);
+    }
+
     .vote-receipt {
       text-align: center;
       padding: 28px;
@@ -818,6 +1258,20 @@ const html = String.raw`<!DOCTYPE html>
         rgba(52,211,153,.09);
       border: 1px solid rgba(52,211,153,.35);
       box-shadow: 0 24px 70px rgba(0,0,0,.32);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .vote-receipt::before {
+      content: "BMEC";
+      position: absolute;
+      right: -22px;
+      top: 22px;
+      color: rgba(255,255,255,.045);
+      font-size: clamp(4rem, 15vw, 9rem);
+      font-weight: 1000;
+      line-height: .8;
+      pointer-events: none;
     }
 
     .receipt-icon {
@@ -830,6 +1284,22 @@ const html = String.raw`<!DOCTYPE html>
       font-size: 2.2rem;
       background: rgba(52,211,153,.2);
       border: 1px solid rgba(52,211,153,.45);
+    }
+
+    .receipt-stamp {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      color: #bbf7d0;
+      background: rgba(52,211,153,.12);
+      border: 1px solid rgba(52,211,153,.35);
+      font-weight: 1000;
+      font-size: .82rem;
+      letter-spacing: 0;
+      text-transform: uppercase;
     }
 
     .vote-receipt h2 {
@@ -891,7 +1361,142 @@ const html = String.raw`<!DOCTYPE html>
       font-size: .94rem;
     }
 
+    .receipt-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+      text-align: left;
+    }
+
+    .receipt-meta-item {
+      padding: 13px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .receipt-meta-item span {
+      display: block;
+      color: var(--muted);
+      font-size: .74rem;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      font-weight: 950;
+      margin-bottom: 5px;
+    }
+
+    .receipt-meta-item strong {
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+
+    .submit-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at center, rgba(56,189,248,.14), transparent 34%),
+        rgba(7,7,17,.82);
+      backdrop-filter: blur(18px);
+    }
+
+    .submit-overlay.hidden {
+      display: none;
+    }
+
+    .submit-modal {
+      width: min(440px, 100%);
+      padding: 30px;
+      border-radius: 32px;
+      border: 1px solid rgba(250,204,21,.28);
+      background:
+        radial-gradient(circle at top, rgba(250,204,21,.2), transparent 58%),
+        linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.055));
+      box-shadow: 0 34px 120px rgba(0,0,0,.52);
+      text-align: center;
+    }
+
+    .portal-ring {
+      width: 118px;
+      height: 118px;
+      margin: 0 auto 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(250,204,21,.18);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .portal-ring::before,
+    .portal-ring::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: inherit;
+      border: 3px solid transparent;
+      border-top-color: var(--gold);
+      border-right-color: rgba(56,189,248,.8);
+      animation: spin 1s linear infinite;
+    }
+
+    .portal-ring::after {
+      inset: 22px;
+      border-top-color: var(--green);
+      border-right-color: rgba(167,139,250,.8);
+      animation-duration: 1.35s;
+      animation-direction: reverse;
+    }
+
+    .portal-ring span {
+      width: 42px;
+      height: 42px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      background: rgba(250,204,21,.16);
+      border: 1px solid rgba(250,204,21,.32);
+      font-size: 1.4rem;
+      z-index: 1;
+    }
+
+    .submit-modal h2 {
+      color: #fde68a;
+      margin-bottom: 8px;
+      letter-spacing: 0;
+    }
+
+    .submit-modal p {
+      color: var(--muted);
+      line-height: 1.6;
+      font-weight: 750;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
     @media (max-width: 900px) {
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-step {
+        min-height: auto;
+        grid-template-columns: auto 1fr;
+        text-align: left;
+        align-items: center;
+      }
+
       .party-grid {
         grid-template-columns: 1fr;
       }
@@ -927,6 +1532,10 @@ const html = String.raw`<!DOCTYPE html>
 
       .submitted-video video {
         min-height: 220px;
+      }
+
+      .receipt-meta-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -966,7 +1575,10 @@ const html = String.raw`<!DOCTYPE html>
           <label for="pin">PIN</label>
           <input id="pin" type="password" placeholder="Enter PIN" autocomplete="current-password" />
 
-          <button class="btn" onclick="login()">Enter Portal</button>
+          <button class="btn" onclick="login()">
+            <span class="btn-icon" aria-hidden="true">🔐</span>
+            <span>Enter Portal</span>
+          </button>
           <div id="loginMessage" style="margin-top:14px"></div>
         </div>
       </div>
@@ -974,10 +1586,33 @@ const html = String.raw`<!DOCTYPE html>
       <div class="card hidden" id="voteCard">
         <div class="card-header">
           <h2>Record Your Vote</h2>
-          <p>Say clearly: “I vote for [party name], candidate [candidate name].” Recording stops automatically after 10 seconds.</p>
+          <p>BMEC member mode is active. Say clearly: “I vote for [party name], candidate [candidate name].”</p>
         </div>
 
         <div class="card-body">
+          <div class="flow" id="voteFlow" aria-label="Vote progress">
+            <div class="flow-step active" data-stage="party">
+              <strong>Party</strong>
+              <span>Pick one</span>
+            </div>
+            <div class="flow-step" data-stage="camera">
+              <strong>Camera</strong>
+              <span>Get ready</span>
+            </div>
+            <div class="flow-step" data-stage="record">
+              <strong>Record</strong>
+              <span>10 seconds</span>
+            </div>
+            <div class="flow-step" data-stage="review">
+              <strong>Review</strong>
+              <span>Check video</span>
+            </div>
+            <div class="flow-step" data-stage="submit">
+              <strong>Submit</strong>
+              <span>Lock vote</span>
+            </div>
+          </div>
+
           <div id="voteMessage" class="notice">Select a party, start camera, record your vote, then submit.</div>
 
           <label>Choose party</label>
@@ -985,22 +1620,53 @@ const html = String.raw`<!DOCTYPE html>
 
           <div style="height:16px"></div>
 
-          <video id="preview" autoplay muted playsinline></video>
+          <div class="media-stage">
+            <div class="stage-meta">
+              <span class="stage-chip" id="cameraState">Camera idle</span>
+              <span class="stage-chip hidden" id="recordingState">Recording</span>
+            </div>
+            <video id="preview" autoplay muted playsinline></video>
+          </div>
 
-          <div class="timer" id="timer">10s</div>
+          <div class="timer-chip">
+            <div class="timer" id="timer">10s</div>
+          </div>
 
           <div class="actions">
-            <button class="btn secondary" onclick="startCamera()">Start Camera</button>
-            <button class="btn" onclick="startRecording()">Record 10s</button>
-            <button class="btn danger" onclick="stopCamera()">Stop Camera</button>
+            <button class="btn secondary" onclick="startCamera()">
+              <span class="btn-icon" aria-hidden="true">📷</span>
+              <span>Start Camera</span>
+            </button>
+            <button class="btn" onclick="startRecording()">
+              <span class="btn-icon" aria-hidden="true">●</span>
+              <span>Record 10s</span>
+            </button>
+            <button class="btn danger" onclick="stopCamera()">
+              <span class="btn-icon" aria-hidden="true">■</span>
+              <span>Stop Camera</span>
+            </button>
           </div>
 
           <div style="height:10px"></div>
 
-          <button class="btn" onclick="submitVote()">Submit Vote Video</button>
+          <button class="btn" id="submitVoteBtn" onclick="submitVote()">
+            <span class="btn-icon" aria-hidden="true">📤</span>
+            <span class="btn-label">Submit Vote Video</span>
+            <span class="btn-loader" aria-hidden="true"></span>
+          </button>
         </div>
       </div>
     </section>
+  </div>
+
+  <div class="submit-overlay hidden" id="submitOverlay" role="status" aria-live="polite">
+    <div class="submit-modal">
+      <div class="portal-ring">
+        <span aria-hidden="true">🗳️</span>
+      </div>
+      <h2>Locking Your Vote</h2>
+      <p>Uploading your verified video ballot to the private BMEC record.</p>
+    </div>
   </div>
 
   <script>
@@ -1013,6 +1679,9 @@ const html = String.raw`<!DOCTYPE html>
     let chunks = [];
     let recordedBlob = null;
     let countdownInterval = null;
+    let isSubmitting = false;
+
+    const voteStages = ['party', 'camera', 'record', 'review', 'submit'];
 
     async function api(path, options = {}) {
       const headers = options.headers || {};
@@ -1043,6 +1712,72 @@ const html = String.raw`<!DOCTYPE html>
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
+    }
+
+    function setStatusPill(text, state = '') {
+      const pill = document.getElementById('loginStatus');
+
+      pill.textContent = text;
+      pill.className = state ? 'status-pill ' + state : 'status-pill';
+    }
+
+    function updateWorkflow(activeStage) {
+      const activeIndex = voteStages.indexOf(activeStage);
+
+      document.querySelectorAll('.flow-step').forEach((step) => {
+        const stepIndex = voteStages.indexOf(step.dataset.stage);
+
+        step.classList.toggle('active', stepIndex === activeIndex);
+        step.classList.toggle('done', stepIndex >= 0 && stepIndex < activeIndex);
+      });
+    }
+
+    function setCameraState(text, isRecording = false) {
+      const cameraState = document.getElementById('cameraState');
+      const recordingState = document.getElementById('recordingState');
+
+      if (cameraState) {
+        cameraState.textContent = text;
+      }
+
+      if (recordingState) {
+        recordingState.classList.toggle('hidden', !isRecording);
+        recordingState.classList.toggle('recording', isRecording);
+      }
+    }
+
+    function setSubmitLoading(isLoading) {
+      const button = document.getElementById('submitVoteBtn');
+      const overlay = document.getElementById('submitOverlay');
+
+      isSubmitting = isLoading;
+
+      if (overlay) {
+        overlay.classList.toggle('hidden', !isLoading);
+      }
+
+      if (!button) return;
+
+      const label = button.querySelector('.btn-label');
+
+      button.disabled = isLoading;
+      button.classList.toggle('loading', isLoading);
+
+      if (label) {
+        label.textContent = isLoading ? 'Submitting...' : 'Submit Vote Video';
+      }
+    }
+
+    function createReceiptId(vote) {
+      const source = [vote.name, vote.partyId, vote.submittedAt].join('-');
+      let hash = 0;
+
+      for (let i = 0; i < source.length; i += 1) {
+        hash = ((hash << 5) - hash) + source.charCodeAt(i);
+        hash |= 0;
+      }
+
+      return 'BMEC-' + Math.abs(hash).toString(36).toUpperCase().padStart(6, '0');
     }
 
     async function login() {
@@ -1087,7 +1822,7 @@ const html = String.raw`<!DOCTYPE html>
     }
 
     function showPortal(existingVote = null) {
-      document.getElementById('loginStatus').textContent = 'Logged in as ' + currentUser;
+      setStatusPill('BMEC Verified - ' + currentUser, 'verified');
       document.getElementById('loginCard').classList.add('hidden');
       document.getElementById('voteCard').classList.remove('hidden');
 
@@ -1096,6 +1831,8 @@ const html = String.raw`<!DOCTYPE html>
         return;
       }
 
+      updateWorkflow('party');
+      setCameraState('Camera idle');
       renderParties();
     }
 
@@ -1111,23 +1848,36 @@ const html = String.raw`<!DOCTYPE html>
       const submittedAt = vote.submittedAt
         ? new Date(vote.submittedAt).toLocaleString()
         : new Date().toLocaleString();
+      const receiptId = escapeHtml(createReceiptId(vote));
+      const memberName = escapeHtml(vote.name || currentUser);
 
       voteCard.innerHTML =
         '<div class="card-header">' +
           '<h2>Your Submitted Vote</h2>' +
-          '<p>Your vote is locked and cannot be changed.</p>' +
+          '<p>Your BMEC ballot is locked and cannot be changed.</p>' +
         '</div>' +
         '<div class="card-body">' +
           '<div class="vote-receipt">' +
+            '<div class="receipt-stamp">BMEC ballot locked</div>' +
             '<div class="receipt-icon">✅</div>' +
             '<h2>Vote Submitted Successfully</h2>' +
             '<p class="lock-note">' +
-              'You can only view the party you voted for and the video you submitted.' +
+              'Your private member vote is sealed with the video you submitted.' +
             '</p>' +
             '<div class="voted-party-card" style="border-color: ' + partyColor + '; box-shadow: 0 0 34px color-mix(in srgb, ' + partyColor + ' 35%, transparent);">' +
               '<div class="voted-symbol">' + symbol + '</div>' +
               '<h3>' + party + '</h3>' +
               '<p>Candidate: <strong>' + candidate + '</strong></p>' +
+            '</div>' +
+            '<div class="receipt-meta-grid">' +
+              '<div class="receipt-meta-item">' +
+                '<span>Member</span>' +
+                '<strong>' + memberName + '</strong>' +
+              '</div>' +
+              '<div class="receipt-meta-item">' +
+                '<span>Receipt</span>' +
+                '<strong>' + receiptId + '</strong>' +
+              '</div>' +
             '</div>' +
             '<div class="submitted-video">' +
               '<label>Your submitted video</label>' +
@@ -1137,8 +1887,7 @@ const html = String.raw`<!DOCTYPE html>
           '</div>' +
         '</div>';
 
-      document.getElementById('loginStatus').textContent =
-        'Vote submitted by ' + currentUser;
+      setStatusPill('Vote locked - ' + currentUser, 'submitted');
     }
 
     function renderParties() {
@@ -1170,6 +1919,7 @@ const html = String.raw`<!DOCTYPE html>
             'Selected: ' + party.party + ', candidate ' + party.candidate + '.',
             'notice'
           );
+          updateWorkflow(stream ? 'record' : 'camera');
         };
 
         grid.appendChild(div);
@@ -1188,9 +1938,14 @@ const html = String.raw`<!DOCTYPE html>
         preview.controls = false;
         preview.muted = true;
 
+        setCameraState('Camera ready');
+        updateWorkflow(selectedPartyId ? 'record' : 'party');
+
         message(
           document.getElementById('voteMessage'),
-          'Camera started. You can now record your 10-second vote.',
+          selectedPartyId
+            ? 'Camera started. You can now record your 10-second vote.'
+            : 'Camera started. Select a party before recording.',
           'notice success'
         );
       } catch (err) {
@@ -1203,6 +1958,12 @@ const html = String.raw`<!DOCTYPE html>
     }
 
     function stopCamera() {
+      if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+      }
+
+      clearInterval(countdownInterval);
+
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
@@ -1213,10 +1974,14 @@ const html = String.raw`<!DOCTYPE html>
       if (preview) {
         preview.srcObject = null;
       }
+
+      setCameraState(recordedBlob ? 'Video ready' : 'Camera idle');
     }
 
     async function startRecording() {
       if (!selectedPartyId) {
+        updateWorkflow('party');
+
         return message(
           document.getElementById('voteMessage'),
           'Select a party first.',
@@ -1252,6 +2017,9 @@ const html = String.raw`<!DOCTYPE html>
         preview.controls = true;
         preview.muted = false;
 
+        setCameraState('Video ready');
+        updateWorkflow('review');
+
         message(
           document.getElementById('voteMessage'),
           'Recording complete. Review it and submit your vote.',
@@ -1263,6 +2031,8 @@ const html = String.raw`<!DOCTYPE html>
 
       let seconds = 10;
       document.getElementById('timer').textContent = seconds + 's';
+      setCameraState('Recording vote', true);
+      updateWorkflow('record');
 
       message(
         document.getElementById('voteMessage'),
@@ -1289,7 +2059,11 @@ const html = String.raw`<!DOCTYPE html>
     }
 
     async function submitVote() {
+      if (isSubmitting) return;
+
       if (!selectedPartyId) {
+        updateWorkflow('party');
+
         return message(
           document.getElementById('voteMessage'),
           'Select a party first.',
@@ -1298,6 +2072,8 @@ const html = String.raw`<!DOCTYPE html>
       }
 
       if (!recordedBlob) {
+        updateWorkflow(selectedPartyId ? 'record' : 'party');
+
         return message(
           document.getElementById('voteMessage'),
           'Record a 10-second video first.',
@@ -1310,6 +2086,14 @@ const html = String.raw`<!DOCTYPE html>
       form.append('video', recordedBlob, currentUser + '-vote.webm');
 
       try {
+        setSubmitLoading(true);
+        updateWorkflow('submit');
+        message(
+          document.getElementById('voteMessage'),
+          'Submitting your vote video...',
+          'notice'
+        );
+
         const res = await fetch('/api/vote', {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token },
@@ -1322,8 +2106,12 @@ const html = String.raw`<!DOCTYPE html>
           throw new Error(data.error || 'Upload failed');
         }
 
+        setSubmitLoading(false);
         showSubmittedVote(data.vote);
       } catch (err) {
+        setSubmitLoading(false);
+        updateWorkflow('review');
+
         message(
           document.getElementById('voteMessage'),
           err.message,
